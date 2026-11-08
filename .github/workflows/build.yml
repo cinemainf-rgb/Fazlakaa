@@ -6,13 +6,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    container:
+      image: kivy/buildozer:stable
     steps:
       - uses: actions/checkout@v4
-      - name: Build APK with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1.2.0
-        with:
-          command: buildozer android debug
-          buildozer_version: stable
+      - name: Build APK
+        run: |
+          buildozer android debug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
