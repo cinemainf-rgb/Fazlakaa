@@ -4,56 +4,94 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.clock import Clock
 import socket, hashlib, binascii, threading, traceback, random, json
 from datetime import datetime
+
+def L(text, h=28, color=(1,1,1,1), size=16, bold=False):
+    lbl = Label(text=text, size_hint_y=None, height=h, color=color, font_size=size, bold=bold, halign='center')
+    lbl.bind(size=lambda *x: setattr(lbl, 'text_size', lbl.size))
+    return lbl
+
+def T(text="", hint=""):
+    ti = TextInput(text=text, hint_text=hint, multiline=False, size_hint_y=None, height=52, font_size=18, background_color=(1,1,1,1), foreground_color=(0,0,0,1))
+    return ti
+
+def B(text, fn, h=54, bg=(0.2,0.6,1,1)):
+    btn = Button(text=text, size_hint_y=None, height=h, font_size=17, bold=True, background_color=bg, background_normal='')
+    btn.bind(on_press=fn)
+    return btn
+
+def SEP(text, color=(0,0.8,1,1)):
+    return L(text, h=36, color=color, size=18, bold=True)
+
 class FazlakaApp(App):
     selected_profile = "vip"
     router_pass = ""
     last_cards = []
     last_card_info = None
     def build(self):
-        scroll = ScrollView()
-        root = GridLayout(cols=1, spacing=5, padding=10, size_hint_y=None, height=1600)
-        def L(text, h=28, color=(1,1,1,1)):
-            lbl = Label(text=text, size_hint_y=None, height=h, color=color)
-            root.add_widget(lbl); return lbl
-        def T(text="", hint=""):
-            ti = TextInput(text=text, hint_text=hint, multiline=False, size_hint_y=None, height=45)
-            root.add_widget(ti); return ti
-        def B(text, fn, h=48):
-            btn = Button(text=text, size_hint_y=None, height=h)
-            btn.bind(on_press=fn); root.add_widget(btn); return btn
-        L("Fazlaka - Login", h=35)
-        L("Router IP", h=22); self.ip_input = T(text="10.10.10.1")
-        L("Router User", h=22); self.user_input = T(text="admin")
-        L("Router Password", h=22); self.pass_input = T(hint="Router Password"); self.pass_input.password = True
-        self.login_status = L("Not Connected", h=28, color=(1,0.5,0.5,1))
-        B("LOGIN / CONNECT", self.do_login)
-        self.router_name = L("Router: -", h=28)
-        self.router_info = L("RouterOS - Uptime: -", h=25)
-        self.hotspot_label = L("Hotspot: -", h=28)
-        self.selected_label = L("Selected Profile: vip", h=30, color=(1,1,0,1))
-        L("--- Choose Profile ---", h=28, color=(0,0.8,1,1))
+        self.sm = ScreenManager()
+        # ===== SCREEN 1 - LOGIN ONLY =====
+        login = Screen(name='login')
+        scroll1 = ScrollView()
+        root1 = GridLayout(cols=1, spacing=10, padding=20, size_hint_y=None)
+        root1.bind(minimum_height=root1.setter('height'))
+        root1.add_widget(L(" ", h=60))
+        root1.add_widget(L("FAZLAKA", h=60, color=(0,1,0.8,1), size=38, bold=True))
+        root1.add_widget(L("Hotspot Manager", h=26, color=(0.7,0.7,0.7,1), size=15))
+        root1.add_widget(L(" ", h=30))
+        root1.add_widget(SEP("--- Login ---", (1,0.8,0,1)))
+        root1.add_widget(L("Router IP", h=24)); self.ip_input = T(text="10.10.10.1"); root1.add_widget(self.ip_input)
+        root1.add_widget(L("Router User", h=24)); self.user_input = T(text="admin"); root1.add_widget(self.user_input)
+        root1.add_widget(L("Router Password", h=24)); self.pass_input = T(hint="Router Password"); self.pass_input.password = True; root1.add_widget(self.pass_input)
+        self.login_status = L("Not Connected", h=30, color=(1,0.5,0.5,1), bold=True); root1.add_widget(self.login_status)
+        root1.add_widget(L(" ", h=10))
+        root1.add_widget(B("LOGIN / CONNECT", self.do_login, h=60, bg=(0,0.7,0.3,1)))
+        root1.add_widget(L(" ", h=20))
+        root1.add_widget(L("RazyTech - 5890IV", h=22, color=(0.5,0.5,0.5,1), size=13))
+        scroll1.add_widget(root1)
+        login.add_widget(scroll1)
+        self.sm.add_widget(login)
+        # ===== SCREEN 2 - MAIN INSIDE =====
+        main = Screen(name='main')
+        scroll2 = ScrollView()
+        root = GridLayout(cols=1, spacing=8, padding=12, size_hint_y=None)
+        root.bind(minimum_height=root.setter('height'))
+        root.add_widget(B("LOGOUT", lambda x: setattr(self.sm, 'current', 'login'), h=44, bg=(0.5,0.5,0.5,1)))
+        root.add_widget(L("FAZLAKA", h=38, color=(0,1,0.8,1), size=26, bold=True))
+        self.router_name = L("Router: -", h=26, bold=True); root.add_widget(self.router_name)
+        self.router_info = L("RouterOS - Uptime: -", h=24, color=(0.8,0.8,0.8,1)); root.add_widget(self.router_info)
+        self.hotspot_label = L("Hotspot: -", h=26, color=(1,1,0,1), bold=True); root.add_widget(self.hotspot_label)
+        self.selected_label = L("Selected Profile: vip", h=30, color=(1,1,0,1), bold=True); root.add_widget(self.selected_label)
+        root.add_widget(SEP("--- Choose Profile ---"))
+        grid = GridLayout(cols=2, spacing=6, size_hint_y=None)
+        grid.bind(minimum_height=grid.setter('height'))
         for prof in ["M", "2M", "vip", "vip_5M", "profile_20_2GB", "profile_50_8GB", "profile_100_2GB"]:
-            B(prof, lambda x, p=prof: self.select_profile(p), h=42)
-        L("--- Create Cards ---", h=28, color=(0,1,0.5,1))
-        L("Price", h=22); self.price_input = T(text="20")
-        L("Quota GB", h=22); self.quota_input = T(text="5")
-        L("Time Hours", h=22); self.time_input = T(text="24")
-        L("Card Digits", h=22); self.digits_input = T(text="6")
-        L("Number of Cards", h=22); self.count_input = T(text="10")
-        self.result = L("", h=60, color=(0,1,0.5,1))
-        self.cards_list = L("", h=300, color=(1,1,1,1))
-        B("GENERATE RANDOM CARDS", self.do_create)
-        B("PRINT DIRECT - RazyTech", self.print_direct)
-        B("SALES", lambda x: threading.Thread(target=self.show_sales, daemon=True).start())
-        L("--- Expenses ---", h=28, color=(1,0.5,0.5,1))
-        L("Expense Amount", h=22); self.expense_amount = T(text="", hint="Expense")
-        L("Expense Reason", h=22); self.expense_reason = T(text="", hint="Reason")
-        B("ADD EXPENSE", self.do_add_expense)
-        scroll.add_widget(root)
-        return scroll
+            btn = B(prof, lambda x, p=prof: self.select_profile(p), h=48, bg=(0.25,0.25,0.35,1))
+            grid.add_widget(btn)
+        root.add_widget(grid)
+        root.add_widget(SEP("--- Create Cards ---", (0,1,0.5,1)))
+        root.add_widget(L("Price", h=22)); self.price_input = T(text="20"); root.add_widget(self.price_input)
+        root.add_widget(L("Quota GB", h=22)); self.quota_input = T(text="5"); root.add_widget(self.quota_input)
+        root.add_widget(L("Time Hours", h=22)); self.time_input = T(text="24"); root.add_widget(self.time_input)
+        root.add_widget(L("Card Digits", h=22)); self.digits_input = T(text="6"); root.add_widget(self.digits_input)
+        root.add_widget(L("Number of Cards", h=22)); self.count_input = T(text="10"); root.add_widget(self.count_input)
+        self.result = L("", h=40, color=(0,1,0.5,1), bold=True); root.add_widget(self.result)
+        self.cards_list = L("", h=120, color=(1,1,1,1)); root.add_widget(self.cards_list)
+        root.add_widget(B("GENERATE RANDOM CARDS", self.do_create, h=56, bg=(0,0.7,0.9,1)))
+        root.add_widget(B("PRINT DIRECT - RazyTech", self.print_direct, h=56, bg=(1,0.6,0,1)))
+        root.add_widget(B("SALES", lambda x: threading.Thread(target=self.show_sales, daemon=True).start(), h=52, bg=(0.5,0,0.8,1)))
+        root.add_widget(SEP("--- Expenses ---", (1,0.5,0.5,1)))
+        root.add_widget(L("Expense Amount", h=22)); self.expense_amount = T(text="", hint="Expense"); root.add_widget(self.expense_amount)
+        root.add_widget(L("Expense Reason", h=22)); self.expense_reason = T(text="", hint="Reason"); root.add_widget(self.expense_reason)
+        root.add_widget(B("ADD EXPENSE", self.do_add_expense, h=52, bg=(0.8,0.2,0.2,1)))
+        root.add_widget(L(" ", h=30))
+        scroll2.add_widget(root)
+        main.add_widget(scroll2)
+        self.sm.add_widget(main)
+        return self.sm
     def select_profile(self, p):
         self.selected_profile = p
         self.selected_label.text = f"Selected Profile: {p}"
@@ -76,6 +114,7 @@ class FazlakaApp(App):
                 self.router_name.text = f"Router: {d.get('board-name','-')}"
                 self.router_info.text = f"RouterOS {d.get('version','-')} - Uptime: {d.get('uptime','-')}"
                 self.hotspot_label.text = f"Active: {len(active)} | Users: {len(users)} | Profiles: {len(profs)}"
+                self.sm.current = 'main'
             Clock.schedule_once(ok, 0)
         except Exception as e:
             print(traceback.format_exc())
